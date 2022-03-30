@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-set -exo pipefail
+set -eo pipefail
 
 ppwd="$(pwd)"
 
@@ -8,7 +8,7 @@ ppwd="$(pwd)"
 mkdir -p root
 
 # bootstrap with pacstrap
-pacstrap -i root busybox filesystem vim
+pacstrap -i root busybox filesystem vim kmod usbutils pciutils util-linux
 
 # make busybox aliases
 cd root
@@ -21,11 +21,14 @@ cd root
     cp "/lib/modules/$(uname -r)"/modules* "usr/lib/modules/$(uname -r)/"
     "${ppwd}/walkmod.sh" "${ppwd}/modlist" | while read -r modfile
     do
-        relpath="${modfile##*/lib/modules/"$(uname -r)"/}"
+        relpath="usr/lib/modules/$(uname -r)/${modfile##*/lib/modules/"$(uname -r)"/}"
         mkdir -p "${relpath%/*}"
         cp "$modfile" "$relpath"
     done
-    cp -r "/lib/modules/$(uname -r)/vmlinuz" vmlinuz
+    cp -r "/lib/modules/$(uname -r)/vmlinuz" ../vmlinuz
+
+    # cleanup pacman
+    rm -rf var/cache/pacman
 
 cd ..
 
@@ -33,6 +36,8 @@ cd ..
 cp init.sh root/init
 sed -i 's/!mods!/'"$(tr '\n' ' ' < "${ppwd}/modlist")"'/g' root/init
 
-# make squashfs
-mksquashfs root myinitramfs.img -comp zstd -noappend
+# make initrd
+cd root
+    find . -print0 | cpio --null --create --format=newc | zstd > ../myinitramfs.img
+cd ..
 

@@ -2,7 +2,7 @@
 
 for mod in !mods!
 do
-    modprobe "$mod"
+    /usr/bin/modprobe "$mod"
 done
 
 sleep 1
