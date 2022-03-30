@@ -5,12 +5,66 @@ set -eo pipefail
 ppwd="$(pwd)"
 
 # make root
-mkdir -p root
+mkdir -p root root/usr/lib root/usr/bin
+cd root
+    ln -s usr/lib lib || :
+    ln -s usr/lib lib64 || :
+    ln -s usr/bin bin || :
+    ln -s usr/bin sbin || :
+cd ..
 
-# bootstrap with pacstrap
-pacstrap -i root busybox filesystem vim kmod usbutils pciutils util-linux
+# bootstrap with apk static
+download/sbin/apk.static \
+    --arch x86_64 \
+    -X https://mirrors.ustc.edu.cn/alpine/edge/main/ \
+    -X https://mirrors.ustc.edu.cn/alpine/edge/community/ \
+    -U \
+    --allow-untrusted \
+    --root root \
+    --initdb add \
+        eudev \
+        vim \
+        usbutils \
+        pciutils \
+        util-linux \
+        kmod \
+        zstd \
+        gzip \
+        tar \
+        lz4 \
+        xz \
+        e2fsprogs \
+        gptfdisk \
+        e2fsprogs \
+        xfsprogs \
+        lvm2 \
+        ntfs-3g \
+        ntfs-3g-progs \
+        dosfstools \
+        download/glibc*.apk
+# for usr/lib/libxx symlinks
+symlink_pkgs=(libcrypto1.1 libssl1.1 eudev-libs)
+for pkg in "${symlink_pkgs[@]}"
+do
+    rm "download/${pkg}"*.apk || :
+done
+
+download/sbin/apk.static \
+    --arch x86_64 \
+    -X https://mirrors.ustc.edu.cn/alpine/edge/main/ \
+    -X https://mirrors.ustc.edu.cn/alpine/edge/community/ \
+    -U \
+    --allow-untrusted \
+    --root root \
+    fetch -o download "${symlink_pkgs[@]}"
+
+for pkg in "${symlink_pkgs[@]}"
+do
+    tar -C root -hxf download/"$pkg"*.apk --exclude 'usr/lib/lib*.so*' --exclude '.*'
+done
 
 # make busybox aliases
+cp download/usr/bin/busybox root/bin/
 cd root
     cd bin
         "${ppwd}/mkalias.sh"
@@ -27,14 +81,13 @@ cd root
     done
     cp -r "/lib/modules/$(uname -r)/vmlinuz" ../vmlinuz
 
-    # cleanup pacman
-    rm -rf var/cache/pacman
-
+# rm cache
+    rm -r var/cache/apk
 cd ..
 
 # copy init
 cp init.sh root/init
-sed -i 's/!mods!/'"$(tr '\n' ' ' < "${ppwd}/modlist")"'/g' root/init
+sed -i 's/!mods!/'"$(sed 's/#.\+//g' "${ppwd}/modlist" | tr '\n' ' ')"'/g' root/init
 
 # make initrd
 cd root

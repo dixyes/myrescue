@@ -1,17 +1,22 @@
-#!/usr/bin/busybox sh
+#!/bin/busybox sh
 
 for mod in !mods!
 do
-    /usr/bin/modprobe "$mod"
+    /bin/modprobe "$mod"
 done
 
 sleep 1
 
-mount -t proc none /proc
-mount -t sysfs none /sys
-mount -t devtmpfs none /dev
+mkdir -p /proc /sys /dev /run /tmp
+mount -t proc -o nosuid,nodev,noexec proc /proc
+mount -t sysfs -o nosuid,nodev,noexec sys /sys
+mount -t tmpfs -o nosuid,nodev run /run
+mount -t devtmpfs dev /dev
+mkdir -p /dev/shm
+mount -t tmpfs -o nosuid,nodev tmpfs /dev/shm
+mount -t tmpfs -o nosuid,nodev tmpfs /tmp
 
-echo '/bin/mdev' > /proc/sys/kernel/hotplug
+#echo '/bin/mdev' > /proc/sys/kernel/hotplug
 
 cat << EOF
 
@@ -26,6 +31,6 @@ Let's mess the whole world up!
 
 EOF
 
-exec /usr/bin/busybox sh -c 'setsid cttyhack sh'
+exec /bin/busybox sh -c 'setsid cttyhack sh'
 
 
