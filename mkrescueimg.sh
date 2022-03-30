@@ -26,6 +26,7 @@ download/sbin/apk.static \
         vim \
         usbutils \
         pciutils \
+        findutils \
         util-linux \
         kmod \
         zstd \
@@ -42,6 +43,7 @@ download/sbin/apk.static \
         ntfs-3g-progs \
         dosfstools \
         download/glibc*.apk
+
 # for usr/lib/libxx symlinks
 symlink_pkgs=(libcrypto1.1 libssl1.1 eudev-libs)
 for pkg in "${symlink_pkgs[@]}"
@@ -60,7 +62,34 @@ download/sbin/apk.static \
 
 for pkg in "${symlink_pkgs[@]}"
 do
-    tar -C root -hxf download/"$pkg"*.apk --exclude 'usr/lib/lib*.so*' --exclude '.*'
+    tar -C root -hxf download/"$pkg"*.apk --exclude 'usr/lib/lib*.so*' --exclude '.*' 2>/dev/null
+done
+
+# for bin/xx symlinks
+symlink_pkgs=(tar eudev gzip)
+for pkg in "${symlink_pkgs[@]}"
+do
+    rm "download/${pkg}"*.apk || :
+done
+
+download/sbin/apk.static \
+    --arch x86_64 \
+    -X https://mirrors.ustc.edu.cn/alpine/edge/main/ \
+    -X https://mirrors.ustc.edu.cn/alpine/edge/community/ \
+    -U \
+    --allow-untrusted \
+    --root root \
+    fetch -o download "${symlink_pkgs[@]}"
+
+for pkg in "${symlink_pkgs[@]}"
+do
+    badlinks="$(tar -C root -tvf download/"$pkg"*.apk 2>/dev/null | grep -Pe '^lrwxrwxrwx.+(usr/bin|sbin)/(.+)\s+->\s+/bin/\2' | sed -E 's#.+((usr/bin|sbin)/.+)\s+->.+#\1#g')" || :
+    tar_args=()
+    for badlink in $badlinks
+    do
+        tar_args+=(--exclude "$badlink")
+    done
+    tar -C root -hxf download/"$pkg"*.apk --exclude 'usr/lib/lib*.so*' --exclude '.*' "${tar_args[@]}" 2>/dev/null
 done
 
 # make busybox aliases

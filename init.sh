@@ -16,7 +16,15 @@ mkdir -p /dev/shm
 mount -t tmpfs -o nosuid,nodev tmpfs /dev/shm
 mount -t tmpfs -o nosuid,nodev tmpfs /tmp
 
-#echo '/bin/mdev' > /proc/sys/kernel/hotplug
+if [ -f /proc/sys/kernel/hotplug ]
+then
+    echo '/bin/mdev' > /proc/sys/kernel/hotplug
+else
+    /bin/udevd --daemon --resolve-names=never
+fi
+
+udevadm trigger
+udevadm settle
 
 cat << EOF
 
