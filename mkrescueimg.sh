@@ -115,8 +115,8 @@ cd root
 cd ..
 
 # copy init
-cp init.sh root/init
-sed -i 's/!mods!/'"$(sed 's/#.\+//g' "${ppwd}/modlist" | tr '\n' ' ')"'/g' root/init
+cp init init.pre.sh init.shell.sh root/
+sed -i 's/!mods!/'"$(sed 's/#.\+//g' "${ppwd}/modlist" | tr '\n' ' ')"'/g' root/init.pre.sh
 
 # make initrd
 cd root
