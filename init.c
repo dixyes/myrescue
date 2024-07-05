@@ -34,9 +34,6 @@
 #define RB_AUTOBOOT 0x1234567
 
 #define AT_FDCWD -100
-#define AT_STATX_FORCE_SYNC 0x2000
-#define STATX_TYPE 0x0001U
-#define STATX_MODE 0x0002U
 #define X_OK 1
 
 typedef long long int64_t;
@@ -89,135 +86,54 @@ struct sigaction {
     sigset_t   sa_mask;
 } __attribute__((packed));
 
-struct statx_timestamp {
-    int64_t tv_sec;    /* Seconds since the Epoch (UNIX time) */
-    uint32_t tv_nsec;   /* Nanoseconds since tv_sec */
-} __attribute__((packed));
+#if defined(__aarch64__)
+# define syscall_decl(name, num, ...) \
+int64_t name(__VA_ARGS__);
+#elif defined(__x86_64__)
+# define syscall_decl(name, num, ...) \
+int64_t __attribute__((sysv_abi)) name(__VA_ARGS__);
+#define syscall_declx syscall_decl
+#else
+#error not supported
+#endif
 
-struct statx {
-    uint32_t stx_mask;        /* Mask of bits indicating
-                                filled fields */
-    uint32_t stx_blksize;     /* Block size for filesystem I/O */
-    uint64_t stx_attributes;  /* Extra file attribute indicators */
-    uint32_t stx_nlink;       /* Number of hard links */
-    uint32_t stx_uid;         /* User ID of owner */
-    uint32_t stx_gid;         /* Group ID of owner */
-    uint16_t stx_mode;        /* File type and mode */
-    uint64_t stx_ino;         /* Inode number */
-    uint64_t stx_size;        /* Total size in bytes */
-    uint64_t stx_blocks;      /* Number of 512B blocks allocated */
-    uint64_t stx_attributes_mask;
-                            /* Mask to show what's supported
-                                in stx_attributes */
+#include "syscalldef.h"
 
-    /* The following fields are file timestamps */
-    struct statx_timestamp stx_atime;  /* Last access */
-    struct statx_timestamp stx_btime;  /* Creation */
-    struct statx_timestamp stx_ctime;  /* Last status change */
-    struct statx_timestamp stx_mtime;  /* Last modification */
+#define syscall_failed(ret) (ret < 0 && ret > -4096)
 
-    /* If this file represents a device, then the next two
-        fields contain the ID of the device */
-    uint32_t stx_rdev_major;  /* Major ID */
-    uint32_t stx_rdev_minor;  /* Minor ID */
+int64_t myclone(uint64_t flags, void* stack, void* parent_tidptr, void* child_tidptr, void* tls, void* fn, void* arg);
 
-    /* The next two fields contain the ID of the device
-        containing the filesystem where the file resides */
-    uint32_t stx_dev_major;   /* Major ID */
-    uint32_t stx_dev_minor;   /* Minor ID */
-    uint64_t stx_mnt_id;      /* Mount ID */
-} __attribute__((packed));
+#define write_stdout(msg) write(1, msg, sizeof(msg))
+#define write_stderr(msg) write(2, msg, sizeof(msg))
 
-#define syscall_decl(name, num, ...) \
-int64_t __attribute__((sysv_abi, naked)) name(__VA_ARGS__) { \
-    asm volatile( \
-    /* #name ":\n\t" */ \
-        "mov $" #num ", %rax\n\t" \
-        "syscall\n\t" \
-        "ret\n\t" \
-    ); \
-}
-#define syscall_declx(name, num, ...) \
-int64_t __attribute__((sysv_abi, naked)) name(__VA_ARGS__) { \
-    asm volatile( \
-    /* #name ":\n\t" */ \
-        "mov %rcx, %r10\n\t" \
-        "mov $" #num ", %rax\n\t" \
-        "syscall\n\t" \
-        "ret\n\t" \
-    ); \
+__attribute__((noreturn)) void breakpoint();
+__attribute__((noreturn)) void abort(const char* msg) {
+    write_stderr(msg);
+    breakpoint();
 }
 
-syscall_decl(write, 1, uint64_t fd, const char *buf, size_t len)
-//syscall_decl(stat, 4, const char *restrict pathname, struct stat *restrict statbuf)
-syscall_declx(mmap, 9, void *addr, size_t length, int prot, int flags, int fd, off_t offset)
-syscall_declx(rt_sigaction, 13, int signum, const struct sigaction *restrict act, struct sigaction *restrict oldact, size_t sigsetsize)
-syscall_decl(rt_sigreturn, 15)
-syscall_decl(access, 21, const char *pathname, int mode)
-syscall_decl(nanosleep, 35, const struct timespec *req, struct timespec *rem)
-syscall_decl(execve, 59, const char *pathname, char *const argv[], char *const envp[])
-syscall_decl(exit, 60, uint64_t ret)
-//syscall_declx(wait4, 61, pid_t pid, int *wstatus, int options, struct rusage *rusage)
-syscall_decl(kill, 62, uint64_t pid, uint64_t signal)
-syscall_decl(sigaltstack, 131, const stack_t *restrict ss, stack_t *restrict old_ss)
-syscall_decl(sync, 162)
-syscall_declx(reboot, 169, uint64_t m1, uint64_t m2, uint64_t cmd, void* arg)
-syscall_decl(restart_syscall, 219)
-syscall_declx(waitid, 247, idtype_t idtype, id_t id, siginfo_t *infop, int options)
-syscall_declx(statx, 332, int dirfd, const char *restrict pathname, int flags, unsigned int mask, struct statx *restrict statxbuf)
-
-#define syscall_failed(x) (ret < 0 && ret > -4096)
-
-int64_t __attribute__((sysv_abi, naked)) myclone(uint64_t flags, void* stack, void* parent_tidptr, void* child_tidptr, void* tls, void* fn, void* arg) {
-    asm volatile(
-        "mov 8(%rsp), %r12\n\t" // save arg
-        "mov %rcx, %r10\n\t" // calling convention convert
-        "mov $56, %rax\n\t" // SYS_CLONE = 56 for x86_64
-        "syscall\n\t" // call clone(2) with flags, stack, parent_tidptr, child_tidptr, tls
-        "test %rax, %rax\n\t" // check if we are child or parent
-        "jz 1f\n\t"
-        "ret\n\t"
-        "1: xor %rbp, %rbp\n\t" // clean rbp according to calling convention
-        "mov %r12, %rdi\n\t"
-        "call *%r9\n\t" // call fn(arg)
-        "mov %rax, %rdi\n\t"
-        "call exit\n\t" // exit with fn result
-    );
-}
-
-// shabby strlen
+// dummy strlen
 size_t strlen(const char* buf) {
     size_t ret = 0;
     while (buf[ret++] != '\0');
     return ret-1;
 }
 
-int __attribute__((sysv_abi, naked, noreturn)) _start(void* this, int argc, char** argv, void* init, void* fini, void* reg) {
-    asm volatile (
-        "xor %rbp,%rbp\n\t"
-        "pop %rdi\n\t" // argc
-        "mov %rsp,%rsi\n\t" // argv
-        "call main\n\t"
-        "mov %rax, %rdi\n\t"
-        "mov $60, %rax\n\t" // exit
-        "syscall\n\t"
-    );
-}
-
-#define write_stdout(msg) write(1, msg, sizeof(msg))
-#define write_stderr(msg) write(2, msg, sizeof(msg))
-
 typedef struct _fork_cmd_t {
     const char *cmd;
-    char** argv;
-    char** envp;
+    const char * const* argv;
+    const char * const* envp;
 } fork_cmd_t;
 
 int invoke_cmd(fork_cmd_t* cmd) {
     write_stdout("[myinit] calling ");
     write(1, cmd->cmd, strlen(cmd->cmd));
     write_stdout("\n");
-    execve(cmd->cmd, cmd->argv, cmd->envp);
+    int64_t ret = execve(cmd->cmd, (char**)cmd->argv, (char**)cmd->envp);
+    if (syscall_failed(ret)) {
+        write_stderr("[myinit] failed to execve\n");
+        return -1;
+    }
     return 0;
 }
 
@@ -253,7 +169,7 @@ void signal_handler(int signal) {
             write_stderr("[myinit] received sigusr2, shutting down\n");
             break;
         default:
-            asm volatile ("ud2\n\t");
+            abort("unknown signal\n");
             return;
     }
     int64_t ret;
@@ -282,14 +198,14 @@ void signal_handler(int signal) {
     ret = reboot(0xfee1dead, 0x28121969/* torvalds' birth date */, cmd, NULL);
     if (syscall_failed(ret)) {
         write_stderr("[myinit] failed reboot syscall\n");
-        asm volatile ("ud2\n\t");
+        abort("reboot failed\n");
     }
 }
 
-int main(int argc, char** argv) {
+int main(int argc, char** argv, char** envp) {
     int64_t ret;
 
-    write_stdout("[myinit] dix's simple init daemon for x86_64 starting\n");
+    write_stdout("[myinit] dix's simple init daemon starting\n");
 
     ret = mmap(
         NULL,
@@ -336,10 +252,12 @@ int main(int argc, char** argv) {
     siginfo_t siginfo;
     fork_cmd_t cmd = {
         .cmd = "/init.pre.sh",
-        .argv = argv,
+        .argv = (void*)argv,
+        .envp = (void*)envp,
     };
 
-    if (syscall_failed(access("/init.pre.sh", X_OK))) {
+    ret = faccessat2(AT_FDCWD, "/init.pre.sh", X_OK, 0);
+    if (syscall_failed(ret)) {
         write_stderr("[myinit] /init.pre.sh cannot be invoked, skipping\n");
     } else {
         ret = myclone(
@@ -351,6 +269,7 @@ int main(int argc, char** argv) {
             invoke_cmd,
             &cmd
         );
+        write(1, (void*)&ret, 8);
         check_and_assign(pid_t, pid, "clone for init pre");
 
         ret = waitid(P_PID, pid, &siginfo, WEXITED);
@@ -362,23 +281,32 @@ int main(int argc, char** argv) {
     }
     
     cmd.cmd = NULL;
+    // strange arm64 gcc code generation
+    // if let arr[] = {"a", "b"}, arr[1] will become 0x10a0 things
+    // i guess there is magic in gcc init routines
+    const char * shell_guess_str = "/init.shell.sh\0" "/usr/bin/bash\0" "/usr/bin/ash\0" "/usr/bin/sh";
     const char * const shell_guess[] = {
-        "/init.shell.sh",
-        "/bin/bash",
-        "/usr/bin/bash",
-        "/bin/ash",
-        "/usr/bin/ash",
-        "/bin/sh",
-        "/usr/bin/sh",
-    }; 
+        &shell_guess_str[0],
+        &shell_guess_str[19],
+        &shell_guess_str[15],
+        &shell_guess_str[33],
+        &shell_guess_str[29],
+        &shell_guess_str[46],
+        &shell_guess_str[42],
+    };
     for (int i = 0; i < sizeof(shell_guess) / sizeof(char*); i++) {
-        if (!syscall_failed(access(shell_guess[i], X_OK))) {
-            cmd.cmd = shell_guess[i];
+        const char *path = shell_guess[i];
+        write_stderr("[myinit] trying shell ");
+        write(2, path, strlen(path));
+        write_stderr("\n");
+        ret = faccessat2(AT_FDCWD, path, X_OK, 0);
+        if (!syscall_failed(ret)) {
+            cmd.cmd = path;
             break;
         }
     }
     if (!cmd.cmd) {
-        write_stderr("[myinit] cannot find any shell, exiting");
+        write_stderr("[myinit] cannot find any shell, exiting\n");
         return -2; // ENOENT
     }
 
@@ -400,5 +328,5 @@ int main(int argc, char** argv) {
         write_stderr("[myinit] shell exited, reopening\n");
     }
     // never here
-    asm volatile ("ud2\n\t");
+    abort("myinit: unreachable code\n");
 }
