@@ -1,9 +1,12 @@
-root
-vmlinuz
-download
-initramfs.img
+
 play
 .vscode
+
+download
+root
+initramfs.img
+gnu-efi_inst
+stubby.efi
 
 *.o
 *.a
