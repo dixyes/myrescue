@@ -1,4 +1,4 @@
-#if defined(__aarch64__)
+#if defined(__aarch64__) || (defined(__riscv_xlen) && __riscv_xlen == 64)
 syscall_decl(write, 64, uint64_t fd, const char *buf, size_t len)
 syscall_decl(mmap, 222, void *addr, size_t length, int prot, int flags, int fd, off_t offset)
 syscall_decl(rt_sigaction, 134, int signum, const struct sigaction *restrict act, struct sigaction *restrict oldact, size_t sigsetsize)
@@ -13,6 +13,13 @@ syscall_decl(reboot, 142, uint64_t m1, uint64_t m2, uint64_t cmd, void* arg)
 syscall_decl(restart_syscall, 128)
 syscall_decl(waitid, 95, idtype_t idtype, id_t id, siginfo_t *infop, int options)
 syscall_decl(faccessat2, 439, int dirfd, const char *restrict pathname, int amode, int flags)
+syscall_decl(mount, 40, const char *source, const char *target,
+                 const char *filesystemtype, unsigned long mountflags,
+                 const void * data);
+syscall_decl(chroot, 51, const char *new_root);
+syscall_decl(mkdirat, 34, int dirfd, const char *pathname, uint16_t mode);
+syscall_decl(openat, 56, int dirfd, const char *pathname, int flags, uint16_t mode);
+syscall_decl(getdents64, 61, int fd, void *dirp, size_t count);
 #elif defined(__x86_64__)
 syscall_decl(write, 1, uint64_t fd, const char *buf, size_t len)
 syscall_declx(mmap, 9, void *addr, size_t length, int prot, int flags, int fd, off_t offset)
@@ -29,6 +36,15 @@ syscall_declx(reboot, 169, uint64_t m1, uint64_t m2, uint64_t cmd, void* arg)
 syscall_decl(restart_syscall, 219)
 syscall_declx(waitid, 247, idtype_t idtype, id_t id, siginfo_t *infop, int options)
 syscall_declx(faccessat2, 439, int dirfd, const char *restrict pathname, int amode, int flags)
+syscall_declx(mount, 165, const char *source, const char *target,
+                 const char *filesystemtype, unsigned long mountflags,
+                 const void * data);
+syscall_decl(chroot, 161, const char *new_root);
+syscall_declx(mkdirat, 258, int dirfd, const char *pathname, uint16_t mode);
+syscall_declx(openat, 257, int dirfd, const char *pathname, int flags, uint16_t mode);
+syscall_decl(getdents64, 217, int fd, void *dirp, size_t count);
+syscall_decl(close, 3, int fd);
+syscall_decl(dup2, 33, int fd, int fd2);
 #else
 #error not supported
 #endif

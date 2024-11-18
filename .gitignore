@@ -1,4 +1,8 @@
 root
 vmlinuz
 download
+play
 
+*.o
+*.a
+init/init

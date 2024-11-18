@@ -1,0 +1,7 @@
+{
+    "files.associations": {
+        "*.tac": "python",
+        "*.phpt": "php",
+        "syscalldef.h": "c"
+    }
+}
