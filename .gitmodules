@@ -1,6 +1,0 @@
-[submodule "stubby"]
-	path = stubby
-	url = https://github.com/puzzleos/stubby
-[submodule "gnu-efi"]
-	path = gnu-efi
-	url = https://github.com/ncroxon/gnu-efi
