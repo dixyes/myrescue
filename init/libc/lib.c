@@ -103,6 +103,8 @@ int init(int argc, char** argv, char** envp) {
                     case R_X86_64_RELATIVE:
                         *(intptr_t *)((uint64_t)rela->r_offset + ehdr) = rela->r_addend + (intptr_t)ehdr;
 #elif defined(__riscv)
+                    case R_RISCV_RELATIVE:
+                        *(intptr_t *)((uint64_t)rela->r_offset + ehdr) = rela->r_addend + (intptr_t)ehdr;
 #else
 # error not supported
 #endif
@@ -117,9 +119,30 @@ int init(int argc, char** argv, char** envp) {
         }
     }
 
-
-
-
     // call main
     return main(argc, argv, envp);
+}
+
+// stdlib functions for fucking complier
+void *memcpy(void *dest, const void *src, size_t n) {
+    for (size_t i = 0; i < n; i++) {
+        ((char*)dest)[i] = ((char*)src)[i];
+    }
+    return dest;
+}
+
+void *memset(void *s, int c, size_t n) {
+    for (size_t i = 0; i < n; i++) {
+        ((char*)s)[i] = c;
+    }
+    return s;
+}
+
+int memcmp(const void *s1, const void *s2, size_t n) {
+    for (size_t i = 0; i < n; i++) {
+        if (((char*)s1)[i] != ((char*)s2)[i]) {
+            return ((char*)s1)[i] - ((char*)s2)[i];
+        }
+    }
+    return 0;
 }

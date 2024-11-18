@@ -101,6 +101,7 @@ typedef struct {
 #elif defined(__x86_64__)
 # define R_X86_64_RELATIVE 8
 #elif defined(__riscv)
+# define R_RISCV_RELATIVE 3
 #else
 #  error not supported
 #endif
@@ -212,10 +213,16 @@ __attribute__((noreturn)) static inline void abort(const char* msg) {
 void *__auxv;
 size_t __pagesize;
 size_t __minsigstksize;
+void *memcpy(void *dest, const void *src, size_t n);
+void *memset(void *s, int c, size_t n);
+int memcmp(const void *s1, const void *s2, size_t n);
 #else
 extern void *__auxv;
 extern size_t __pagesize;
 extern size_t __minsigstksize;
+extern void *memcpy(void *dest, const void *src, size_t n);
+extern void *memset(void *s, int c, size_t n);
+extern int memcmp(const void *s1, const void *s2, size_t n);
 #endif
 
 #endif // __DEFS_H
