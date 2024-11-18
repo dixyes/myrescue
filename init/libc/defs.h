@@ -97,6 +97,7 @@ typedef struct {
 #define ELF64_R_TYPE(info) ((info) & 0xffffffff)
 
 #if defined(__aarch64__)
+# define R_AARCH64_RELATIVE 1027
 #elif defined(__x86_64__)
 # define R_X86_64_RELATIVE 8
 #elif defined(__riscv)

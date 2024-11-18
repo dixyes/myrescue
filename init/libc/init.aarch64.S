@@ -34,8 +34,8 @@ _start:
     add x1, sp, #8 // argv
     add x2, x1, x0, lsl #3 // envp
     add x2, x2, #8
-    // call main
-    bl main
+    // call init
+    bl init
     // exit
     mov x8, #93
     svc #0

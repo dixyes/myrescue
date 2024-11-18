@@ -40,6 +40,9 @@ int init(int argc, char** argv, char** envp) {
     if (!phdrs || !phdr_num) {
         abort("cannot find phdr, cannot do reloc\n");
     }
+    // write(2, "ehdr: ", 6);
+    // writehex(2, (intptr_t)ehdr);
+    // write(2, "\n", 1);
     for (i = 0; i < phdr_num; i++) {
         Elf_Phdr *ph = &phdrs[i];
         if (ph->p_type != PT_DYNAMIC) {
@@ -60,9 +63,9 @@ int init(int argc, char** argv, char** envp) {
                 // TODO: REL and RELR, arch specific
                 case DT_RELA:
                     relas = dyn->d_un.d_val + ehdr;
-                    write(2, "rela: ", 6);
-                    writehex(2, (intptr_t)relas);
-                    write(2, "\n", 1);
+                    // write(2, "rela: ", 6);
+                    // writehex(2, (intptr_t)relas);
+                    // write(2, "\n", 1);
                     break;
                 case DT_RELAENT:
                     if (dyn->d_un.d_val != sizeof(Elf_Rela)) {
@@ -84,6 +87,7 @@ int init(int argc, char** argv, char** envp) {
         if (relas && rela_nums) {
             // do rela relocation
             for (int j = 0; j < rela_nums; j++) {
+                Elf_Rela *rela = &relas[j];
                 // write(2, "rela: ", 6);
                 // writehex(2, (intptr_t)rela->r_offset);
                 // write(2, ", ", 2);
@@ -91,9 +95,10 @@ int init(int argc, char** argv, char** envp) {
                 // write(2, ", ", 2);
                 // writehex(2, (intptr_t)rela->r_addend);
                 // write(2, "\n", 1);
-                Elf_Rela *rela = &relas[j];
                 switch (ELF64_R_TYPE(rela->r_info)) {
 #if defined(__aarch64__)
+                    case R_AARCH64_RELATIVE:
+                        *(intptr_t *)((uint64_t)rela->r_offset + ehdr) = rela->r_addend + (intptr_t)ehdr;
 #elif defined(__x86_64__)
                     case R_X86_64_RELATIVE:
                         *(intptr_t *)((uint64_t)rela->r_offset + ehdr) = rela->r_addend + (intptr_t)ehdr;

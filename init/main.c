@@ -10,8 +10,9 @@
 
 #define check_syscall(msg) \
     if (syscall_failed(ret)) { \
-        write_stderr("[myinit] failed " msg "\n"); \
-        write(1, (void*)&ret, sizeof(ret)); \
+        write_stderr("[myinit] failed " msg ", ret: "); \
+        writehex(2, -ret); \
+        write(2, "\n", 1); \
         return -ret; \
     }
 #define check_and_assign(type, var, msg) \
@@ -50,7 +51,9 @@ void signal_handler(int signal) {
 
     ret = kill(-1, SIGTERM);
     if (syscall_failed(ret)) {
-        write_stderr("[myinit] kill(-1, SIGTERM) failed\n");
+        write_stderr("[myinit] kill(-1, SIGTERM) failed, ret: ");
+        writehex(2, -ret);
+        write(2, "\n", 1);
     }
 
     struct timespec ts = {
@@ -63,12 +66,16 @@ void signal_handler(int signal) {
 
     ret = kill(-1, SIGKILL);
     if (syscall_failed(ret)) {
-        write_stderr("[myinit] kill(-1, SIGKILL) failed\n");
+        write_stderr("[myinit] kill(-1, SIGKILL) failed, ret: ");
+        writehex(2, -ret);
+        write(2, "\n", 1);
     }
 
     ret = reboot(0xfee1dead, 0x28121969/* torvalds' birth date */, cmd, NULL);
     if (syscall_failed(ret)) {
-        write_stderr("[myinit] failed reboot syscall\n");
+        write_stderr("[myinit] failed reboot syscall, ret: ");
+        writehex(2, -ret);
+        write(2, "\n", 1);
         abort("reboot failed\n");
     }
 }
@@ -85,7 +92,9 @@ int invoke_cmd(fork_cmd_t* cmd) {
     write_stdout("\n");
     int64_t ret = execve(cmd->cmd, (char**)cmd->argv, (char**)cmd->envp);
     if (syscall_failed(ret)) {
-        write_stderr("[myinit] failed to execve\n");
+        write_stderr("[myinit] failed to execve, ret: ");
+        writehex(2, -ret);
+        write(2, "\n", 1);
         return -1;
     }
     return 0;
@@ -153,7 +162,9 @@ int main(int argc, char** argv, char** envp) {
 
     ret = faccessat2(AT_FDCWD, "/init.pre.sh", X_OK, 0);
     if (syscall_failed(ret)) {
-        write_stderr("[myinit] /init.pre.sh cannot be invoked, skipping\n");
+        write_stderr("[myinit] /init.pre.sh cannot be invoked, skipping, ret: ");
+        writehex(2, -ret);
+        write(2, "\n", 1);
     } else {
         ret = myclone(
             CLONE_FS | SIGCHLD, // allow child pivot root

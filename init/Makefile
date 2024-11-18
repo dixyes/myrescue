@@ -8,7 +8,7 @@ CFLAGS_MAIN := -nodefaultlibs -nostartfiles -nostdlib -e _start
 all: init
 
 libc:
-	$(MAKE) -C libc
+	$(MAKE) -C libc CC=$(CC)
 
 main.o: main.c
 	$(CC) $(CFLAGS) -c -o $@ $^
