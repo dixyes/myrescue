@@ -14,6 +14,7 @@ typedef unsigned long long size_t;
 typedef unsigned long long off_t;
 typedef unsigned long long time_t;
 typedef uint64_t pid_t;
+typedef uint64_t intptr_t;
 typedef unsigned uid_t;
 typedef unsigned long long id_t;
 typedef unsigned long long idtype_t;
@@ -55,20 +56,69 @@ struct sigaction {
     sigset_t   sa_mask;
 } __attribute__((packed));
 
-// syscalls
-# if defined(__aarch64__)
-#  define syscall_decl(name, num, ...) \
-int64_t name(__VA_ARGS__);
-# elif defined(__x86_64__)
-#  define syscall_decl(name, num, ...) \
-int64_t __attribute__((sysv_abi)) name(__VA_ARGS__);
-#define syscall_declx syscall_decl
-# elif defined(__riscv)
-#  define syscall_decl(name, num, ...) \
-int64_t name(__VA_ARGS__);
-# else
+#if defined(__aarch64__) || (defined(__riscv_xlen) && __riscv_xlen == 64) || defined(__x86_64__)
+typedef struct {
+    uint64_t d_tag;
+    union {
+        uint64_t d_val;
+        void *d_ptr;
+    } d_un;
+} Elf_Dyn;
+
+typedef struct {
+    uint32_t p_type;
+    uint32_t p_flags;
+    off_t p_offset;
+    void *p_vaddr;
+    void *p_paddr;
+    size_t p_filesz;
+    size_t p_memsz;
+    size_t p_align;
+} Elf_Phdr;
+
+typedef struct {
+    void *r_offset;
+    uint64_t r_info;
+    int64_t r_addend;
+} Elf_Rela;
+
+typedef struct {
+    uint64_t type;
+    union {
+        uint64_t a_val;
+        void *a_ptr;
+        void (*a_fcn)();
+    } a_un;
+} auxv_t;
+#else
+# error not supported
+#endif
+
+#define ELF64_R_TYPE(info) ((info) & 0xffffffff)
+
+#if defined(__aarch64__)
+#elif defined(__x86_64__)
+# define R_X86_64_RELATIVE 8
+#elif defined(__riscv)
+#else
 #  error not supported
-# endif
+#endif
+
+
+// syscalls
+#if defined(__aarch64__)
+# define syscall_decl(name, num, ...) \
+int64_t name(__VA_ARGS__);
+#elif defined(__x86_64__)
+# define syscall_decl(name, num, ...) \
+int64_t __attribute__((sysv_abi)) name(__VA_ARGS__);
+# define syscall_declx syscall_decl
+#elif defined(__riscv)
+# define syscall_decl(name, num, ...) \
+int64_t name(__VA_ARGS__);
+#else
+# error not supported
+#endif
 
 #include "syscalldef.h"
 
@@ -112,6 +162,23 @@ int64_t name(__VA_ARGS__);
 #define O_RDONLY 0
 #define O_WRONLY 1
 
+#define AT_NULL 0
+#define AT_PHDR 3
+#define AT_PHENT 4
+#define AT_PHNUM 5
+#define AT_PAGESZ 6
+#define AT_BASE 7
+#define AT_SYSINFO_EHDR	33
+#define AT_MINSIGSTKSZ 51
+
+#define PT_NULL 0
+#define PT_LOAD 1
+#define PT_DYNAMIC 2
+
+#define DT_RELA 7
+#define DT_RELASZ 8
+#define DT_RELAENT 9
+
 // utilities
 
 static inline size_t strlen(const char* buf) {
@@ -119,6 +186,16 @@ static inline size_t strlen(const char* buf) {
     size_t ret = 0;
     while (buf[ret++] != '\0');
     return ret-1;
+}
+
+static inline void writehex(int fd, uint64_t val) {
+    char buf[17];
+    buf[16] = '\0';
+    for (int i = 0; i < 16; i++) {
+        buf[15-i] = "0123456789abcdef"[val & 0xf];
+        val >>= 4;
+    }
+    write(fd, buf, 16);
 }
 
 int64_t myclone(uint64_t flags, void* stack, void* parent_tidptr,
@@ -129,5 +206,15 @@ __attribute__((noreturn)) static inline void abort(const char* msg) {
     write(2, msg, strlen(msg));
     breakpoint();
 }
+
+#ifdef __IN_LIBC
+void *__auxv;
+size_t __pagesize;
+size_t __minsigstksize;
+#else
+extern void *__auxv;
+extern size_t __pagesize;
+extern size_t __minsigstksize;
+#endif
 
 #endif // __DEFS_H

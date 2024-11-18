@@ -2,6 +2,7 @@ root
 vmlinuz
 download
 play
+.vscode
 
 *.o
 *.a

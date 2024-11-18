@@ -1,7 +1,5 @@
 
-// -static-pie -nodefaultlibs -nostartfiles -nostdlib -e _start -ffreestanding -fno-stack-protector
-
-#include "libc/defs.h"
+#include "defs.h"
 
 #define syscall_failed(ret) (ret < 0 && ret > -4096)
 
@@ -30,6 +28,7 @@ void signal_handler(int signal) {
         case SIGINT:
             // graceful exit
             exit(0);
+            breakpoint();
         case SIGTERM:
             // reboot routine
             cmd = RB_AUTOBOOT;
@@ -93,6 +92,7 @@ int invoke_cmd(fork_cmd_t* cmd) {
 }
 
 int main(int argc, char** argv, char** envp) {
+    (void) argc;
     int64_t ret;
     write(1, "[myinit] starting\n", 18);
 
@@ -181,8 +181,11 @@ int main(int argc, char** argv, char** envp) {
         "/usr/bin/bash",
         "/usr/bin/ash",
         "/usr/bin/sh",
+        "/bin/bash",
+        "/bin/ash",
+        "/bin/sh",
     };
-    for (int i = 0; i < sizeof(shell_guess) / sizeof(char*); i++) {
+    for (int i = 0; i < (int)(sizeof(shell_guess) / sizeof(char*)); i++) {
         const char *path = shell_guess[i];
         write_stderr("[myinit] trying shell ");
         write(2, path, strlen(path));

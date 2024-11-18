@@ -25,9 +25,9 @@ myclone:
     mov $56, %rax // SYS_CLONE = 56 for x86_64
     syscall // call clone(2) with flags, stack, parent_tidptr, child_tidptr, tls
     test %rax, %rax // check if we are child or parent
-    jz 1f
+    jz .L1
     ret
-    1: xor %rbp, %rbp // clean rbp according to calling convention
+    .L1: xor %rbp, %rbp // clean rbp according to calling convention
     mov %r12, %rdi
     call *%r9 // call fn(arg)
     mov %rax, %rdi
@@ -38,11 +38,11 @@ myclone:
 .global _start
 _start:
     // parepare argc argv envp
-    mov %rsp, %rdi // argc
+    mov (%rsp), %rdi // argc
     lea 8(%rsp), %rsi // argv
     lea 16(%rsp, %rdi, 8), %rdx // envp
-    // call main
-    call main
+    // call init
+    call init
     // exit
     mov $60, %rax
     syscall
