@@ -3,8 +3,8 @@
 
 #define syscall_failed(ret) (ret < 0 && ret > -4096)
 
-#define write_stdout(msg) write(1, msg, sizeof(msg))
-#define write_stderr(msg) write(2, msg, sizeof(msg))
+#define write_stdout(msg) write(1, msg, sizeof(msg) - 1)
+#define write_stderr(msg) write(2, msg, sizeof(msg) - 1)
 
 #define check_syscall(msg) \
     if (syscall_failed(ret)) { \
@@ -93,6 +93,7 @@ void invoke_cmd(fork_cmd_t* cmd) {
         dup3(cmd->ttyfd, 0, 0);
         dup3(cmd->ttyfd, 1, 0);
         dup3(cmd->ttyfd, 2, 0);
+        close(cmd->ttyfd);
         ioctl(0, TIOCSCTTY, (void*)1);
     }
     write_stdout("[myinit] calling ");

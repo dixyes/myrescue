@@ -81,10 +81,10 @@ init/init:
 	$(MAKE) -C init CC=$(CROSS_COMPILE)gcc ARCH=$(ARCH)
 	$(CROSS_COMPILE)strip -s init/init
 
-root: download/sbin/apk.static init/init
+root: download/sbin/apk.static download/$(ARCH)/$(LINUX_APK) init/init
 	# extract kernel modules
 	mkdir -p root/lib/modules
-	tar -m -C root/lib/modules -xf download/$(ARCH)/$(LINUX_APK) lib/modules
+	tar -m -C root -xf download/$(ARCH)/$(LINUX_APK) lib/modules
 	# install packages
 	download/sbin/apk.static \
 		--arch $(ARCH) \
