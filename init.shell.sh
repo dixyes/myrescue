@@ -13,6 +13,4 @@ Let's mess the whole world up!
 
 EOF
 
-exec /bin/busybox sh -c 'setsid cttyhack sh'
-
-
+exec /bin/busybox sh -c 'setsid sh'

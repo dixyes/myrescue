@@ -6,8 +6,11 @@ ARCH := $(shell uname -m)
 
 all: libc.a
 
-lib.o: lib.c
-	$(CC) $(CFLAGS) -c -o $@ $<
+init.$(ARCH).o: init.$(ARCH).S syscalldef.h
+	$(CC) $(CFLAGS) -c -o $@ init.$(ARCH).S
+
+lib.o: lib.c defs.h syscalldef.h
+	$(CC) $(CFLAGS) -c -o $@ lib.c
 
 libc.a: lib.o init.$(ARCH).o
 	$(AR) rcs $@ $^

@@ -13,7 +13,7 @@ typedef unsigned short uint16_t;
 typedef unsigned long long size_t;
 typedef unsigned long long off_t;
 typedef unsigned long long time_t;
-typedef uint64_t pid_t;
+typedef int32_t pid_t;
 typedef uint64_t intptr_t;
 typedef unsigned uid_t;
 typedef unsigned long long id_t;
@@ -29,13 +29,19 @@ union sigval {
     void   *sigval_ptr;
 };
 
+// if not defined __ARCH_HAS_SWAPPED_SIGINFO
+// only mips defines this
 typedef struct {
-    int      si_signo;
-    int      si_errno;
-    int      si_code;
-    pid_t    si_pid;
+    int32_t si_signo;
+    int32_t si_errno;
+    int32_t si_code;
+    uint32_t __padding1;
+    pid_t si_pid;
     uint32_t si_uid;
-    int      si_status;
+    int32_t si_status;
+    uint64_t si_utime;
+    uint64_t si_stime;
+    char __padding2[128 - 72];
 } __attribute__((packed)) siginfo_t;
 
 typedef struct {
@@ -54,6 +60,16 @@ struct sigaction {
     uint64_t   sa_flags;
     void     (*sa_restorer)(void);
     sigset_t   sa_mask;
+} __attribute__((packed));
+
+struct epoll_event {
+    uint32_t events;
+    union {
+        void *ptr;
+        int fd;
+        uint32_t u32;
+        uint64_t u64;
+    } data;
 } __attribute__((packed));
 
 #if defined(__aarch64__) || (defined(__riscv_xlen) && __riscv_xlen == 64) || defined(__x86_64__)
@@ -138,6 +154,7 @@ int64_t name(__VA_ARGS__);
 
 #define CLONE_FS 0x00000200
 
+#define P_ALL 0
 #define P_PID 1
 #define SIGINT 2
 #define SIGKILL 9
@@ -160,9 +177,18 @@ int64_t name(__VA_ARGS__);
 #define AT_STATX_FORCE_SYNC 0x2000
 #define STATX_TYPE 0x0001U
 #define STATX_MODE 0x0002U
+#define F_OK 0
 #define X_OK 1
 #define O_RDONLY 0
 #define O_WRONLY 1
+#define O_RDWR 2
+#define O_CLOEXEC 02000000
+#define TIOCSCTTY 0x540E
+
+#define MS_RDONLY 1
+#define MS_NOSUID 2
+#define MS_NODEV 4
+#define MS_NOEXEC 8
 
 #define AT_NULL 0
 #define AT_PHDR 3

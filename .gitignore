@@ -5,8 +5,8 @@ play
 download
 root
 initramfs.img
-gnu-efi_inst
-stubby.efi
+vmlinuz
+myrescue*.efi
 
 *.o
 *.a

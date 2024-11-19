@@ -4,8 +4,10 @@
 
 int main(int argc, char** argv, char** envp);
 
-int init(int argc, char** argv, char** envp) {
-    // get aux    
+void reloc(int argc, char** argv, char** envp) {
+    (void) argc;
+    (void) argv;
+    // get aux
     int i;
     for (i = 0; envp[i]; i++);
     __auxv = (void*)&envp[i+1];
@@ -118,9 +120,6 @@ int init(int argc, char** argv, char** envp) {
             }
         }
     }
-
-    // call main
-    return main(argc, argv, envp);
 }
 
 // stdlib functions for fucking complier

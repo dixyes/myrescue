@@ -20,7 +20,8 @@ name: \
 
 .global myclone
 myclone:
-    mov 8(%rsp), %r12 // save arg
+    mov 8(%rsp), %r11 // read arg
+    mov %r11, -8(%rsi) // save arg to new stack
     mov %rcx, %r10 // calling convention convert
     mov $56, %rax // SYS_CLONE = 56 for x86_64
     syscall // call clone(2) with flags, stack, parent_tidptr, child_tidptr, tls
@@ -28,7 +29,7 @@ myclone:
     jz .L1
     ret
     .L1: xor %rbp, %rbp // clean rbp according to calling convention
-    mov %r12, %rdi
+    mov -8(%rsi), %rdi // read arg from new stack
     call *%r9 // call fn(arg)
     mov %rax, %rdi
     call exit // exit with fn result
@@ -41,8 +42,10 @@ _start:
     mov (%rsp), %rdi // argc
     lea 8(%rsp), %rsi // argv
     lea 16(%rsp, %rdi, 8), %rdx // envp
-    // call init
-    call init
+    // call reloc
+    call reloc
+    // call main
+    call main
     // exit
     mov $60, %rax
     syscall

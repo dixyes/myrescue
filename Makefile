@@ -4,13 +4,13 @@ HOST_ARCH := $(shell uname -m)
 CROSS_COMPILE :=
 
 EFI_SUFFIX :=
-ifeq ($(ARCH), "x86_64")
+ifeq ($(ARCH), x86_64)
 	EFI_SUFFIX = x64
-else ifeq ($(ARCH), "aarch64")
+else ifeq ($(ARCH), aarch64)
 	EFI_SUFFIX = aa64
-else ifeq ($(ARCH), "riscv64")
+else ifeq ($(ARCH), riscv64)
 	EFI_SUFFIX = rv64
-else ifeq ($(ARCH), "loongarch64")
+else ifeq ($(ARCH), loongarch64)
 	EFI_SUFFIX = la64
 else
 	ERR = $(error Unsupported architecture: $(ARCH))
@@ -24,6 +24,9 @@ BUSYBOX_APK := busybox-1.37.0-r7.apk
 BUSYBOX_URL := $(ALPINE_MIRROR)/$(ALPINE_VERSION)/main/$(ARCH)/$(BUSYBOX_APK)
 LINUX_APK := linux-lts-6.6.61-r0.apk
 LINUX_URL := $(ALPINE_MIRROR)/$(ALPINE_VERSION)/main/$(ARCH)/$(LINUX_APK)
+DEBIAN_MIRROR := https://mirrors.ustc.edu.cn/debian
+EFISTUB_DEB := systemd-boot-efi_257~rc2-3_arm64.deb
+EFISTUB_URL := $(DEBIAN_MIRROR)/pool/main/s/systemd/$(EFISTUB_DEB)
 PACKAGES := \
 	eudev \
 	vim \
@@ -67,6 +70,10 @@ download/$(ARCH)/$(LINUX_APK):
 	mkdir -p download/$(ARCH)
 	curl -fSL -o $@ $(LINUX_URL)
 
+download/$(ARCH)/$(EFISTUB_DEB):
+	mkdir -p download/$(ARCH)
+	curl -fSL -o $@ $(EFISTUB_URL)
+
 download/sbin/apk.static: download/$(APK_TOOLS_APK)
 	tar -m -C download -xf download/$(APK_TOOLS_APK) sbin/apk.static
 
@@ -80,7 +87,7 @@ root: download/sbin/apk.static init/init
 	tar -m -C root/lib/modules -xf download/$(ARCH)/$(LINUX_APK) lib/modules
 	# install packages
 	download/sbin/apk.static \
-		--arch x86_64 \
+		--arch $(ARCH) \
 		-X $(ALPINE_MIRROR)/$(ALPINE_VERSION)/main/ \
 		-X $(ALPINE_MIRROR)/$(ALPINE_VERSION)/community/ \
 		-U \
@@ -97,41 +104,16 @@ initramfs.img: root init/init
 	cd root && \
     	find . -print0 | cpio --null --create --format=newc | zstd > ../initramfs.img
 
-gnu-efi_inst:
-	$(MAKE) -C gnu-efi \
-		CC=$(CROSS_COMPILE)gcc \
-		LD=$(CROSS_COMPILE)ld \
-		OBJCOPY=$(CROSS_COMPILE)objcopy \
-		ARCH=$(ARCH) -j $(shell nproc)
-	$(MAKE) -C gnu-efi \
-		CC=$(CROSS_COMPILE)gcc \
-		LD=$(CROSS_COMPILE)ld \
-		OBJCOPY=$(CROSS_COMPILE)objcopy \
-		ARCH=$(ARCH) \
-		install DESTDIR=../gnu-efi_inst PREFIX=/
-
-stubby.efi: gnu-efi_inst
-	$(MAKE) -C stubby \
-		CC=$(CROSS_COMPILE)gcc \
-		LD=$(CROSS_COMPILE)ld \
-		OBJCOPY=$(CROSS_COMPILE)objcopy \
-		ARCH=$(ARCH) \
-		EFIINC=../gnu-efi_inst/include/efi \
-		EFILIB=../gnu-efi_inst/lib \
-		-j $(shell nproc) \
-		build
-	if [ -z "$(CROSS_COMPILE)" ] ; \
-	then \
-		$(MAKE) -C stubby \
-			CC=$(CROSS_COMPILE)gcc \
-			LD=$(CROSS_COMPILE)ld \
-			OBJCOPY=$(CROSS_COMPILE)objcopy \
-			ARCH=$(ARCH) \
-			EFIINC=../gnu-efi_inst/include/efi \
-			EFILIB=../gnu-efi_inst/lib \
-			test ; \
-	fi
-	cp stubby/stubby.efi .
+download/$(ARCH)/linux$(EFI_SUFFIX).efi.stub: download/$(ARCH)/$(EFISTUB_DEB)
+	ar -x \
+		--output download/$(ARCH) \
+		download/$(ARCH)/$(EFISTUB_DEB) \
+		data.tar.xz
+	tar -m -C download/$(ARCH) \
+		-xf download/$(ARCH)/data.tar.xz \
+		--strip-components=6 \
+		./usr/lib/systemd/boot/efi/linuxaa64.efi.stub
+	rm download/$(ARCH)/data.tar.xz
 
 vmlinuz:
 	tar -m --strip-components=1 \
@@ -140,28 +122,27 @@ vmlinuz:
 		boot/vmlinuz-*
 	mv vmlinuz-* vmlinuz
 
-myrescue$(EFI_SUFFIX).efi: initramfs.img vmlinuz cmdline stubby.efi
+myrescue$(EFI_SUFFIX).efi: initramfs.img vmlinuz cmdline download/$(ARCH)/linux$(EFI_SUFFIX).efi.stub
+	lastsec=$$($(CROSS_COMPILE)objdump -h download/$(ARCH)/linux$(EFI_SUFFIX).efi.stub | tail -2 | head -1) ; \
+	lastvmaend=$$( \
+		echo $$lastsec | \
+			gawk '{printf "0x%x", lshift(rshift(strtonum("0x"$$4) + strtonum("0x"$$3), 12), 12)}'\
+	) ; \
+	cmdlinevma=$$(echo | gawk '{printf "0x%x", strtonum('"$$lastvmaend"') + 0x30000}') ; \
+	linuxvma=$$(echo | gawk '{printf "0x%x", strtonum('"$$lastvmaend"') + 0x1000000}') ; \
+	initrdvma=$$(echo | gawk '{printf "0x%x", strtonum('"$$lastvmaend"') + 0x3000000}') ; \
+	set -x ; \
 	$(CROSS_COMPILE)objcopy \
 		--add-section=.cmdline=cmdline \
-		--change-section-vma=.cmdline=0x30000 \
+		--change-section-vma=.cmdline="$$cmdlinevma" \
 		--add-section=.linux=vmlinuz \
-		--change-section-vma=.linux=0x1000000 \
+		--change-section-vma=.linux="$$linuxvma" \
 		--add-section=.initrd=initramfs.img \
-		--change-section-vma=.initrd=0x3000000 \
-		stubby.efi myrescue$(EFI_SUFFIX).efi
+		--change-section-vma=.initrd="$$initrdvma" \
+		download/$(ARCH)/linux$(EFI_SUFFIX).efi.stub myrescue$(EFI_SUFFIX).efi
 
 clean:
 	$(MAKE) -C init CC=$(CROSS_COMPILE)gcc ARCH=$(ARCH) clean
-	$(MAKE) -C gnu-efi \
-		CC=$(CROSS_COMPILE)gcc \
-		LD=$(CROSS_COMPILE)ld \
-		OBJCOPY=$(CROSS_COMPILE)objcopy \
-		ARCH=$(ARCH) clean
-	$(MAKE) -C stubby \
-		CC=$(CROSS_COMPILE)gcc \
-		LD=$(CROSS_COMPILE)ld \
-		OBJCOPY=$(CROSS_COMPILE)objcopy \
-		ARCH=$(ARCH) clean
 	rm -rf root initramfs.img vmlinuz myrescue$(EFI_SUFFIX).efi
 
 .PHONY: all clean
