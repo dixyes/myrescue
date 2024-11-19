@@ -35,10 +35,8 @@ _start:
     sll a2, a0, 3 // envp
     add a2, a2, a1
     add a2, a2, 8
-    // call reloc
-    call reloc
-    // call main
-    call main
+    // call init
+    call init
     // exit
     li a7, 93
     scall

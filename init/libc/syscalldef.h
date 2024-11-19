@@ -1,6 +1,6 @@
 #if defined(__aarch64__) || (defined(__riscv_xlen) && __riscv_xlen == 64)
-syscall_decl(read, 0, uint64_t fd, const char *buf, size_t len)
 syscall_decl(close, 57, uint64_t fd)
+syscall_decl(read, 63, uint64_t fd, const char *buf, size_t len)
 syscall_decl(write, 64, uint64_t fd, const char *buf, size_t len)
 syscall_decl(mmap, 222, void *addr, size_t length, int prot, int flags, int fd, off_t offset)
 syscall_decl(rt_sigaction, 134, int signum, const struct sigaction *restrict act, struct sigaction *restrict oldact, size_t sigsetsize)

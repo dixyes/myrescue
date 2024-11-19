@@ -42,10 +42,8 @@ _start:
     mov (%rsp), %rdi // argc
     lea 8(%rsp), %rsi // argv
     lea 16(%rsp, %rdi, 8), %rdx // envp
-    // call reloc
-    call reloc
-    // call main
-    call main
+    // call init
+    call init
     // exit
     mov $60, %rax
     syscall
