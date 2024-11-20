@@ -25,8 +25,8 @@ ALPINE_MIRROR := https://mirrors.ustc.edu.cn/alpine
 ALPINE_VERSION := v3.20
 APK_TOOLS_APK := apk-tools-static-2.14.4-r1.apk
 APK_TOOLS_URL := $(ALPINE_MIRROR)/$(ALPINE_VERSION)/main/$(HOST_ARCH)/$(APK_TOOLS_APK)
-BUSYBOX_APK := busybox-1.37.0-r7.apk
-BUSYBOX_URL := $(ALPINE_MIRROR)/$(ALPINE_VERSION)/main/$(ARCH)/$(BUSYBOX_APK)
+# BUSYBOX_APK := busybox-1.37.0-r7.apk
+# BUSYBOX_URL := $(ALPINE_MIRROR)/$(ALPINE_VERSION)/main/$(ARCH)/$(BUSYBOX_APK)
 
 DEBIAN_MIRROR := https://mirrors.ustc.edu.cn/debian
 LINUX_DEB := linux-image-6.11.9-$(DEBIAN_ARCH)_6.11.9-1_$(DEBIAN_ARCH).deb
@@ -100,11 +100,14 @@ init/init:
 root: download/sbin/apk.static download/$(ARCH)/linux.tar.xz
 	# extract kernel modules
 	mkdir -p root/lib/modules
+	tar -tf download/$(ARCH)/linux.tar.xz | grep -E './usr/lib/modules' && \
+		{ path=./usr/lib/modules; strip=2; } || \
+		{ path=./lib/modules; strip=1; } ; \
 	tar -m \
 		-C root \
-		--strip-components=2 \
+		--strip-components=$$strip \
 		-xf download/$(ARCH)/linux.tar.xz \
-		./usr/lib/modules
+		$$path
 	# install packages
 	download/sbin/apk.static \
 		--arch $(ARCH) \
@@ -130,18 +133,29 @@ download/$(ARCH)/linux$(EFI_SUFFIX).efi.stub: download/$(ARCH)/$(EFISTUB_DEB)
 		--output download/$(ARCH) \
 		download/$(ARCH)/$(EFISTUB_DEB) \
 		data.tar.xz
-	tar -m -C download/$(ARCH) \
-		-xf download/$(ARCH)/data.tar.xz \
-		--strip-components=6 \
-		./usr/lib/systemd/boot/efi/linux$(EFI_SUFFIX).efi.stub
+	if [ '$(ARCH)' = riscv64 ] ; then \
+		tar -m -C download/$(ARCH) \
+			-xf download/$(ARCH)/data.tar.xz \
+			--strip-components=6 \
+			./usr/lib/systemd/boot/efi/linuxriscv64.efi.stub && \
+		mv download/$(ARCH)/linuxriscv64.efi.stub download/$(ARCH)/linux$(EFI_SUFFIX).efi.stub ; \
+	else \
+		tar -m -C download/$(ARCH) \
+			-xf download/$(ARCH)/data.tar.xz \
+			--strip-components=6 \
+			./usr/lib/systemd/boot/efi/linux$(EFI_SUFFIX).efi.stub ; \
+	fi
 	rm download/$(ARCH)/data.tar.xz
 
 vmlinuz: download/$(ARCH)/linux.tar.xz
+	tar -tf download/$(ARCH)/linux.tar.xz | grep -E 'boot/vmlinuz' && \
+		kernelname="vmlinuz" || \
+		kernelname="vmlinux" ; \
 	tar -m --strip-components=2 \
 		-xf download/$(ARCH)/linux.tar.xz \
 		--wildcards \
-		./boot/vmlinuz-*
-	mv vmlinuz-* vmlinuz
+		./boot/$${kernelname}-* ; \
+	mv $${kernelname}-* vmlinuz
 
 myrescue$(EFI_SUFFIX).efi: initramfs.img vmlinuz cmdline download/$(ARCH)/linux$(EFI_SUFFIX).efi.stub
 	lastsec=$$($(CROSS_COMPILE)objdump -h download/$(ARCH)/linux$(EFI_SUFFIX).efi.stub | tail -2 | head -1) ; \
