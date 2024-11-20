@@ -95,7 +95,7 @@ jobs:
           echo f3=myrescue${EFI_SUFFIX}.efi >> ${GITHUB_OUTPUT}
       
       - name: Cache sources
-        uses: actions/cache/save@v2
+        uses: actions/cache/save@v4
         id: cache-save
         with:
           path: |
