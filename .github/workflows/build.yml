@@ -70,6 +70,7 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y \
+            --no-install-recommends \
             gawk curl tar xz-utils zstd \
             make gcc binutils elfutils \
             gcc-aarch64-linux-gnu binutils-aarch64-linux-gnu \
@@ -78,7 +79,7 @@ jobs:
       - name: Build
         id: build
         run: |
-          ./build.py ${{ matrix.arch }}
+          python3 ./build.py ${{ matrix.arch }}
           mv vmlinuz vmlinuz.${{ matrix.arch }}
           mv initramfs.img initramfs.img.${{ matrix.arch }}
           case ${{ matrix.arch }} in
