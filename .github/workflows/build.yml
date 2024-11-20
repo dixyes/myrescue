@@ -48,9 +48,7 @@ jobs:
     needs:
       - gen-jobs
     permissions:
-      id-token: write
       contents: write
-      attestations: write
     strategy:
       max-parallel: 6
       fail-fast: false
@@ -107,20 +105,12 @@ jobs:
           path: |
             download
           key: ${{ runner.os }}-build-v1-${{ hashFiles('download') }}
-      
+
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
           name: ${{ matrix.arch }}
           path: |
-            ${{ steps.build.outputs.f1 }}
-            ${{ steps.build.outputs.f2 }}
-            ${{ steps.build.outputs.f3 }}
-
-      - name: Attestation
-        uses: actions/attest-build-provenance@v1
-        with:
-          subject-path: |
             ${{ steps.build.outputs.f1 }}
             ${{ steps.build.outputs.f2 }}
             ${{ steps.build.outputs.f3 }}
@@ -131,17 +121,30 @@ jobs:
     needs:
       - build
     permissions:
+      id-token: write
       contents: write
+      attestations: write
     steps:
       - name: Generate Release Name
         id: release-name
         run: |
-          echo tag=$(date +"%Y%m%d%H%M%S") > ${GITHUB_OUTPUT}
+          echo tag=$(date +"%Y%m%d") > ${GITHUB_OUTPUT}
       
       - name: Download artifacts
         uses: actions/download-artifact@v4
         with:
           merge-multiple: true
+
+      - name: Attestation
+        id: attest
+        uses: actions/attest-build-provenance@v1
+        with:
+          subject-path: |
+            *
+      
+      - name: Copy attestation
+        run: |
+          cp ${{ steps.attest.outputs.bundle-path }} attestation.jsonl
 
       - name: Release
         uses: softprops/action-gh-release@v2
