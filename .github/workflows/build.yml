@@ -1,4 +1,4 @@
-name: Build x86_64
+name: Build
 
 on:
   workflow_dispatch:
@@ -29,7 +29,7 @@ jobs:
         id: gen-jobs
         shell: python -u {0}
         run: |
-          import os
+          import os, json
 
           arch = '${{ github.event.inputs.archs }}'
           if arch:
