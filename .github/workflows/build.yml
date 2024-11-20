@@ -1,10 +1,5 @@
 name: Build
 
-permissions:
-  id-token: write
-  contents: read
-  attestations: write
-
 on:
   workflow_dispatch:
     inputs:
@@ -53,7 +48,9 @@ jobs:
     needs:
       - gen-jobs
     permissions:
+      id-token: write
       contents: write
+      attestations: write
     strategy:
       max-parallel: 6
       fail-fast: false
