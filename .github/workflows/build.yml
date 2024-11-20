@@ -1,5 +1,10 @@
 name: Build
 
+permissions:
+  id-token: write
+  contents: read
+  attestations: write
+
 on:
   workflow_dispatch:
     inputs:
@@ -114,3 +119,38 @@ jobs:
             ${{ steps.build.outputs.f1 }}
             ${{ steps.build.outputs.f2 }}
             ${{ steps.build.outputs.f3 }}
+
+      - name: Attestation
+        uses: actions/attest-build-provenance@v1
+        with:
+          subject-path: |
+            ${{ steps.build.outputs.f1 }}
+            ${{ steps.build.outputs.f2 }}
+            ${{ steps.build.outputs.f3 }}
+
+  release:
+    name: Release
+    runs-on: ubuntu-latest
+    needs:
+      - build
+    permissions:
+      contents: write
+    steps:
+      - name: Generate Release Name
+        id: release-name
+        run: |
+          echo tag=$(date +"%Y%m%d%H%M%S") > ${GITHUB_OUTPUT}
+      
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+        with:
+          merge-multiple: true
+
+      - name: Release
+        uses: softprops/action-gh-release@v2
+        with:
+          body: automated release
+          name: ${{ steps.release-name.outputs.tag }}
+          tag_name: ${{ steps.release-name.outputs.tag }}
+          files: |
+            *
