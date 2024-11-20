@@ -148,7 +148,7 @@ def determine_linux_url(arch: Literal['x86_64', 'aarch64', 'riscv64', 'loongarch
 
 if __name__ == "__main__":
     arch = sys.argv[1]
-    # fetch_index(arch)
+    fetch_index(arch)
     APK_TOOLS_APK = determine_apk(arch, "apk-tools-static")
     LINUX_URL = determine_linux_url(arch)
     EFISTUB_DEB = determine_deb(arch, "systemd-boot-efi")
