@@ -55,6 +55,9 @@ jobs:
       matrix:
         include: ${{ fromJson(needs.gen-jobs.outputs.jobs) }}
     steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
       - name: Restore sources
         uses: actions/cache/restore@v4
         id: cache-restore
@@ -79,7 +82,7 @@ jobs:
       - name: Build
         id: build
         run: |
-          python3 ./build.py ${{ matrix.arch }}
+          ./build.py ${{ matrix.arch }}
           mv vmlinuz vmlinuz.${{ matrix.arch }}
           mv initramfs.img initramfs.img.${{ matrix.arch }}
           case ${{ matrix.arch }} in
