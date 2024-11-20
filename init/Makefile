@@ -10,8 +10,8 @@ all: init
 libc:
 	$(MAKE) -C libc CC=$(CC)
 
-main.o: main.c
-	$(CC) $(CFLAGS) -c -o $@ $^
+main.o: main.c libc/defs.h libc/syscalldef.h
+	$(CC) $(CFLAGS) -c -o $@ main.c
 
 init: main.o libc
 	$(CC) $(CFLAGS) $(CFLAGS_MAIN) -o $@ main.o libc/libc.a

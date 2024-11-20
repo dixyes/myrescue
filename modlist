@@ -55,7 +55,9 @@ xhci_pci
 
 # virtio
 virtio_pci
+virtio_scsi
 virtio_blk
 virtio_net
+virtio_rng
 virtio_input
 

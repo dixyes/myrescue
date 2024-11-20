@@ -20,7 +20,7 @@ if [ -f /proc/sys/kernel/hotplug ]
 then
     echo '/bin/mdev' > /proc/sys/kernel/hotplug
 else
-    /bin/udevd --daemon --resolve-names=never
+    /sbin/udevd --daemon --resolve-names=never
 fi
 
 udevadm trigger

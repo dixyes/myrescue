@@ -184,6 +184,7 @@ int64_t name(__VA_ARGS__);
 #define O_RDWR 2
 #define O_CLOEXEC 02000000
 #define TIOCSCTTY 0x540E
+#define TIOCNOTTY 0x5422
 
 #define MS_RDONLY 1
 #define MS_NOSUID 2
@@ -209,6 +210,21 @@ int64_t name(__VA_ARGS__);
 
 // utilities
 
+#ifdef __IN_LIBC
+void *__auxv;
+size_t __pagesize;
+size_t __minsigstksize;
+#else
+extern void *__auxv;
+extern size_t __pagesize;
+extern size_t __minsigstksize;
+#endif
+
+
+void *memcpy(void *dest, const void *src, size_t n);
+void *memset(void *s, int c, size_t n);
+int memcmp(const void *s1, const void *s2, size_t n);
+size_t strcpyn(char *dest, const char *src, size_t n);
 static inline size_t strlen(const char* buf) {
     // dummy implementation
     size_t ret = 0;
@@ -234,21 +250,5 @@ __attribute__((noreturn)) static inline void abort(const char* msg) {
     write(2, msg, strlen(msg));
     breakpoint();
 }
-
-#ifdef __IN_LIBC
-void *__auxv;
-size_t __pagesize;
-size_t __minsigstksize;
-void *memcpy(void *dest, const void *src, size_t n);
-void *memset(void *s, int c, size_t n);
-int memcmp(const void *s1, const void *s2, size_t n);
-#else
-extern void *__auxv;
-extern size_t __pagesize;
-extern size_t __minsigstksize;
-extern void *memcpy(void *dest, const void *src, size_t n);
-extern void *memset(void *s, int c, size_t n);
-extern int memcmp(const void *s1, const void *s2, size_t n);
-#endif
 
 #endif // __DEFS_H

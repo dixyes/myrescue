@@ -24,6 +24,7 @@ syscall_decl(openat, 56, int dirfd, const char *pathname, int flags, uint16_t mo
 syscall_decl(getdents64, 61, int fd, void *dirp, size_t count)
 syscall_decl(dup3, 24, int fd, int fd2, int flags)
 syscall_decl(ioctl, 29, int fd, unsigned long request, void *arg)
+syscall_decl(setsid, 157)
 #elif defined(__x86_64__)
 syscall_decl(read, 0, uint64_t fd, const char *buf, size_t len)
 syscall_decl(write, 1, uint64_t fd, const char *buf, size_t len)
@@ -52,6 +53,7 @@ syscall_decl(getdents64, 217, int fd, void *dirp, size_t count)
 syscall_decl(dup3, 292, int fd, int fd2, int flags)
 syscall_decl(ioctl, 16, int fd, unsigned long request, void *arg)
 syscall_decl(mprotect, 10, void *addr, size_t len, int prot)
+syscall_decl(setsid, 112)
 #else
 #error not supported
 #endif

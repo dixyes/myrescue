@@ -82,30 +82,41 @@ typedef struct _fork_cmd_t {
     const char *cmd;
     const char * const* argv;
     const char * const* envp;
-    int ttyfd;
+    const char *tty_name;
 } fork_cmd_t;
 
 void invoke_cmd(fork_cmd_t* cmd) {
-    if (cmd->ttyfd) {
+    if (cmd->tty_name) {
+        int fd = openat(AT_FDCWD, cmd->tty_name, O_RDWR, 0666);
+        if (syscall_failed(fd)) {
+            write_stderr("[myinit] failed to open tty\n");
+            goto skip;
+        }
+        setsid();
+        ioctl(fd, TIOCSCTTY, (void*)1);
+        // fd = openat(AT_FDCWD, "/dev/tty", O_RDWR, 0666);
+        // if (syscall_failed(fd)) {
+        //     write_stderr("[myinit] failed to open tty\n");
+        //     goto skip;
+        // }
         close(0);
         close(1);
         close(2);
-        dup3(cmd->ttyfd, 0, 0);
-        dup3(cmd->ttyfd, 1, 0);
-        dup3(cmd->ttyfd, 2, 0);
-        close(cmd->ttyfd);
-        ioctl(0, TIOCSCTTY, (void*)1);
+        dup3(fd, 0, 0);
+        dup3(fd, 1, 0);
+        dup3(fd, 2, 0);
+        skip:
+        while (fd > 2) {
+            close(fd--);
+        }
     }
     write_stdout("[myinit] calling ");
     write(1, cmd->cmd, strlen(cmd->cmd));
     write_stdout("\n");
     int64_t ret = execve(cmd->cmd, (char**)cmd->argv, (char**)cmd->envp);
-    if (syscall_failed(ret)) {
-        write_stderr("[myinit] failed to execve, ret: ");
-        writehex(2, -ret);
-        write_stderr("\n");
-        exit(1);
-    }
+    write_stderr("[myinit] failed to execve, ret: ");
+    writehex(2, -ret);
+    write_stderr("\n");
     exit(1);
 }
 
@@ -195,11 +206,6 @@ const char *guess_shell() {
     return NULL;
 }
 
-typedef struct {
-    pid_t pid;
-    int ttyfd;
-} subprocess_t;
-
 int main(int argc, char** argv, char** envp) {
     (void) argc;
     (void) argv;
@@ -247,6 +253,11 @@ int main(int argc, char** argv, char** envp) {
     cmd.cmd = shell;
     cmd.argv = (const char* const[]){shell, NULL};
 
+    typedef struct {
+        pid_t pid;
+        int32_t _;
+        char *tty_name;
+    } __attribute__((packed)) subprocess_t;
     size_t mapbufsize = __pagesize;
     ret = mmap(
         NULL,
@@ -256,13 +267,23 @@ int main(int argc, char** argv, char** envp) {
         -1,
         0
     );
-    check_and_assign(subprocess_t *, pidttymap, "mmap for ttynames");
+    check_and_assign(subprocess_t *, pidttymap, "mmap for pidttymap");
+    ret = mmap(
+        NULL,
+        __pagesize,
+        PROT_READ | PROT_WRITE,
+        MAP_PRIVATE | MAP_ANONYMOUS,
+        -1,
+        0
+    );
+    check_and_assign(char *, tty_names, "mmap for tty_names");
     char tty_name[256] = "/dev/";
 
     ret = openat(AT_FDCWD, "/sys/class/tty/console/active", O_RDONLY|O_CLOEXEC, 0644);
     check_and_assign(int, consolesfd, "open consolesfd");
 
     uint64_t slot = 0;
+    size_t tty_names_i = 0;
     for (; slot < mapbufsize / sizeof(*pidttymap);) {
         subprocess_t *pmap = &pidttymap[slot];
         int i = 5;
@@ -287,14 +308,26 @@ int main(int argc, char** argv, char** envp) {
         write(2, tty_name, strlen(tty_name));
         write_stderr("\n");
 
+        // try open tty
         ret = openat(AT_FDCWD, tty_name, O_RDWR, 0644);
         if (syscall_failed(ret)) {
             write_stderr("[myinit] failed to open tty\n");
             continue;
         }
+        // give up this tty
+        ioctl(ret, TIOCNOTTY, NULL);
+        close(ret);
 
-        pmap->ttyfd = ret;
-        cmd.ttyfd = ret;
+
+        size_t copied = strcpyn(&tty_names[tty_names_i], tty_name, __pagesize - tty_names_i);
+        if (copied != strlen(tty_name) + 1) {
+            write_stderr("[myinit] failed to copy tty name\n");
+            break;
+        }
+        pmap->tty_name = &tty_names[tty_names_i];
+        cmd.tty_name = &tty_names[tty_names_i];
+        tty_names_i += copied;
+
         pid = exec_cmd(&cmd, stack);
         if (pid < 0) {
             write_stderr("[myinit] failed to exec shell on tty ");
@@ -306,7 +339,7 @@ int main(int argc, char** argv, char** envp) {
         slot++;
     }
     pidttymap[slot].pid = 0;
-    pidttymap[slot].ttyfd = 0;
+    pidttymap[slot].tty_name = NULL;
 
     while (1) {
         ret = waitid(P_ALL, 0, &siginfo, WEXITED, NULL);
@@ -318,14 +351,14 @@ int main(int argc, char** argv, char** envp) {
                 continue;
             }
             write_stderr("[myinit] subprocess exited, tty: ");
-            writehex(2, pmap->ttyfd);
+            write(2, pmap->tty_name, strlen(pmap->tty_name));
             write_stderr("\n");
 
-            cmd.ttyfd = pmap->ttyfd;
+            cmd.tty_name = pmap->tty_name;
             pid = exec_cmd(&cmd, stack);
             if (pid < 0) {
                 write_stderr("[myinit] failed to exec shell on tty ");
-                writehex(2, pmap->ttyfd);
+                write(2, pmap->tty_name, strlen(pmap->tty_name));
                 write_stderr("\n");
                 continue;
             }
