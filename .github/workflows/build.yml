@@ -1,0 +1,71 @@
+name: Build x86_64
+
+on:
+  workflow_dispatch:
+    inputs:
+      archs:
+        description: "architectures, comma splited, empty for all, available: x86_64, aarch64"
+        required: false
+        type: string
+        default: ""
+  workflow_call:
+    inputs:
+      archs:
+        description: "architectures, comma splited, empty for all, available: x86_64, aarch64"
+        required: false
+        type: string
+        default: ""
+
+jobs:
+  gen-jobs:
+    name: Generate jobs
+    runs-on: ubuntu-latest
+    outputs:
+      jobs: ${{ steps.gen-jobs.outputs.jobs }}
+    permissions:
+      contents: write
+    steps:
+      - name: Generate jobs
+        id: gen-jobs
+        shell: python -u {0}
+        run: |
+          arch = '${{ github.event.inputs.archs }}'
+          if arch:
+              archs = [x.strip() for x in arch.split(',')]
+          else:
+              archs = ['x86_64', 'aarch64']
+          jobs = [{
+              'arch': arch,
+          } for arch in archs]
+          f = open(os.environ.get('GITHUB_OUTPUT'), 'w')
+          print(f'::set-output name=jobs::{json.dumps(jobs)}', file=f)
+
+  build:
+    name: Build ${{ matrix.arch }}
+    runs-on: ubuntu-latest
+    needs:
+      - gen-jobs
+    permissions:
+      contents: write
+    strategy:
+      max-parallel: 6
+      fail-fast: false
+      matrix:
+        include: ${{ fromJson(needs.gen-jobs.outputs.jobs) }}
+    steps:
+      - name: Restore sources
+        uses: actions/cache/restore@v4
+        id: cache-restore
+        with:
+          path: |
+            download
+          key: ${{ runner.os }}-build-v1-${{ hashFiles('download') }}
+          restore-keys: |
+            ${{ runner.os }}-build-v1-
+
+      - name: Prepare tools
+        id: prepare
+        run: |
+          # sudo apt-get update
+          # sudo apt-get install -y \
+          #   make gcc binutils elfutils
