@@ -29,6 +29,8 @@ jobs:
         id: gen-jobs
         shell: python -u {0}
         run: |
+          import os
+
           arch = '${{ github.event.inputs.archs }}'
           if arch:
               archs = [x.strip() for x in arch.split(',')]
@@ -38,7 +40,7 @@ jobs:
               'arch': arch,
           } for arch in archs]
           f = open(os.environ.get('GITHUB_OUTPUT'), 'w')
-          print(f'::set-output name=jobs::{json.dumps(jobs)}', file=f)
+          print(f'jobs={json.dumps(jobs)}', file=f)
 
   build:
     name: Build ${{ matrix.arch }}
@@ -66,6 +68,45 @@ jobs:
       - name: Prepare tools
         id: prepare
         run: |
-          # sudo apt-get update
-          # sudo apt-get install -y \
-          #   make gcc binutils elfutils
+          sudo apt-get update
+          sudo apt-get install -y \
+            gawk curl tar xz-utils zstd \
+            make gcc binutils elfutils \
+            gcc-aarch64-linux-gnu binutils-aarch64-linux-gnu \
+            python3 python3-requests
+      
+      - name: Build
+        id: build
+        run: |
+          ./build.py ${{ matrix.arch }}
+          mv vmlinuz vmlinuz.${{ matrix.arch }}
+          mv initramfs.img initramfs.img.${{ matrix.arch }}
+          case ${{ matrix.arch }} in
+            x86_64)
+              EFI_SUFFIX=x64
+              ;;
+            aarch64)
+              EFI_SUFFIX=aa64
+              ;;
+          esac
+
+          echo f1=vmlinuz.${{ matrix.arch }} >> ${GITHUB_OUTPUT}
+          echo f2=initramfs.img.${{ matrix.arch }} >> ${GITHUB_OUTPUT}
+          echo f3=myrescue${EFI_SUFFIX}.efi >> ${GITHUB_OUTPUT}
+      
+      - name: Cache sources
+        uses: actions/cache/save@v2
+        id: cache-save
+        with:
+          path: |
+            download
+          key: ${{ runner.os }}-build-v1-${{ hashFiles('download') }}
+      
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.arch }}
+          path: |
+            ${{ steps.build.outputs.f1 }}
+            ${{ steps.build.outputs.f2 }}
+            ${{ steps.build.outputs.f3 }}
